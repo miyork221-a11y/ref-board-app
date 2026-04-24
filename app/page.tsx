@@ -953,8 +953,9 @@ export default function Home() {
               color: "#111",
               padding: "22px",
               borderRadius: "26px",
-              width: "840px",
-              maxWidth: "100%",
+              width: "min(92vw, 1100px)",
+              maxWidth: "92vh",
+              overflowY: "auto",
               boxShadow: "0 26px 60px rgba(0,0,0,0.24)",
             }}
           >
@@ -962,10 +963,11 @@ export default function Home() {
               src={selectedItem.image_url}
               style={{
                 width: "100%",
-                maxHeight: "520px",
+                maxHeight: "58vh",
                 objectFit: "contain",
                 borderRadius: "18px",
                 background: "#f4f4f4",
+                display: "block",
               }}
             />
 
