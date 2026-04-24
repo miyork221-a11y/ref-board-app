@@ -1027,7 +1027,7 @@ export default function Home() {
                   <a
                     href={selectedItem.reference_link}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
