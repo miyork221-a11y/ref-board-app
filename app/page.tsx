@@ -61,11 +61,47 @@ export default function Home() {
       setCopyTargetProjectId("");
       return;
     }
+
     const current = items.find((item) => item.id === selectedItemId);
     if (current) {
       setCopyTargetProjectId(current.project_id);
     }
   }, [selectedItemId, items]);
+
+  const getYoutubeVideoId = (url: string) => {
+    try {
+      const parsedUrl = new URL(url);
+
+      if (parsedUrl.hostname.includes("youtube.com")) {
+        const videoId = parsedUrl.searchParams.get("v");
+        if (videoId) return videoId;
+
+        const shortsMatch = parsedUrl.pathname.match(/\/shorts\/([^/?]+)/);
+        if (shortsMatch?.[1]) return shortsMatch[1];
+      }
+
+      if (parsedUrl.hostname.includes("youtu.be")) {
+        const path = parsedUrl.pathname.replace("/", "");
+        return path || null;
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const isYoutubeUrl = (url: string) => {
+    return url.includes("youtube.com") || url.includes("youtu.be");
+  };
+
+  const isYoutubeItem = (item: ProjectItem) => {
+    return (
+      (item.reference_link?.includes("youtube.com") ?? false) ||
+      (item.reference_link?.includes("youtu.be") ?? false) ||
+      (item.tags || []).includes("youtube")
+    );
+  };
 
   const loadProjects = async () => {
     setLoadingProjects(true);
@@ -194,8 +230,26 @@ export default function Home() {
     }
 
     if (!imageUrl.trim()) {
-      alert("OneDrive 이미지 링크를 입력하세요.");
+      alert("이미지 또는 유튜브 링크를 입력하세요.");
       return;
+    }
+
+    const originalUrl = imageUrl.trim();
+    let finalImageUrl = originalUrl;
+    let finalReferenceLink = "";
+    let finalTags: string[] = [];
+
+    if (isYoutubeUrl(originalUrl)) {
+      const videoId = getYoutubeVideoId(originalUrl);
+
+      if (!videoId) {
+        alert("유튜브 링크를 확인할 수 없습니다.");
+        return;
+      }
+
+      finalImageUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+      finalReferenceLink = originalUrl;
+      finalTags = ["youtube"];
     }
 
     setAddingImage(true);
@@ -203,10 +257,10 @@ export default function Home() {
     const { error } = await supabase.from("project_items").insert([
       {
         project_id: selectedProjectId,
-        image_url: imageUrl.trim(),
+        image_url: finalImageUrl,
         note: "",
-        tags: [],
-        reference_link: "",
+        tags: finalTags,
+        reference_link: finalReferenceLink,
       },
     ]);
 
@@ -341,17 +395,15 @@ export default function Home() {
 
     setCopyingItem(true);
 
-    const { error } = await supabase
-      .from("project_items")
-      .insert([
-        {
-          project_id: copyTargetProjectId,
-          image_url: currentItem.image_url,
-          note: currentItem.note || "",
-          tags: currentItem.tags || [],
-          reference_link: currentItem.reference_link || "",
-        },
-      ]);
+    const { error } = await supabase.from("project_items").insert([
+      {
+        project_id: copyTargetProjectId,
+        image_url: currentItem.image_url,
+        note: currentItem.note || "",
+        tags: currentItem.tags || [],
+        reference_link: currentItem.reference_link || "",
+      },
+    ]);
 
     setCopyingItem(false);
 
@@ -482,7 +534,7 @@ export default function Home() {
             <input
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="OneDrive 이미지 링크"
+              placeholder="이미지 또는 유튜브 링크"
               style={{
                 height: "54px",
                 borderRadius: "999px",
@@ -544,9 +596,13 @@ export default function Home() {
             }}
           >
             {loadingProjects ? (
-              <div style={{ color: "#777", padding: "10px 0" }}>프로젝트 불러오는 중...</div>
+              <div style={{ color: "#777", padding: "10px 0" }}>
+                프로젝트 불러오는 중...
+              </div>
             ) : projects.length === 0 ? (
-              <div style={{ color: "#777", padding: "10px 0" }}>프로젝트가 없습니다.</div>
+              <div style={{ color: "#777", padding: "10px 0" }}>
+                프로젝트가 없습니다.
+              </div>
             ) : (
               projects.map((project) => (
                 <div
@@ -668,6 +724,7 @@ export default function Home() {
                           >
                             링크 복사
                           </button>
+
                           <button
                             onClick={() => {
                               deleteProject(project.id);
@@ -816,6 +873,31 @@ export default function Home() {
                     }}
                   />
 
+                  {isYoutubeItem(item) && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "50%",
+                        top: "50%",
+                        transform: "translate(-50%, -50%)",
+                        width: "54px",
+                        height: "54px",
+                        borderRadius: "999px",
+                        background: "rgba(0,0,0,0.62)",
+                        color: "white",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "24px",
+                        fontWeight: 900,
+                        pointerEvents: "none",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
+                      }}
+                    >
+                      ▶
+                    </div>
+                  )}
+
                   <div
                     className="image-overlay"
                     style={{
@@ -963,7 +1045,7 @@ export default function Home() {
               src={selectedItem.image_url}
               style={{
                 width: "100%",
-                maxHeight: "60vh",
+                maxHeight: "58vh",
                 objectFit: "contain",
                 borderRadius: "18px",
                 background: "#f4f4f4",
@@ -1047,7 +1129,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={{ marginTop: "14px" }}>
+            <div style={{ marginTop: "16px" }}>
               <div
                 style={{
                   fontWeight: 800,
@@ -1071,10 +1153,10 @@ export default function Home() {
                     key={index}
                     onClick={() => removeTag(tag)}
                     style={{
-                      padding: "7px 12px",
+                      border: "1px solid #e5e5e5",
+                      background: "white",
                       borderRadius: "999px",
-                      border: "1px solid #dedede",
-                      background: "#fafafa",
+                      padding: "8px 12px",
                       cursor: "pointer",
                       fontSize: "13px",
                     }}
@@ -1155,7 +1237,7 @@ export default function Home() {
                     padding: "12px 18px",
                     borderRadius: "16px",
                     border: "none",
-                    background: "#222",
+                    background: "#111",
                     color: "white",
                     cursor: "pointer",
                     fontWeight: 700,
@@ -1166,7 +1248,13 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                marginTop: "18px",
+              }}
+            >
               <button
                 onClick={() => deleteItem(selectedItem.id)}
                 style={{
@@ -1189,6 +1277,7 @@ export default function Home() {
                   borderRadius: "16px",
                   border: "1px solid #dfdfdf",
                   background: "white",
+                  color: "#111",
                   cursor: "pointer",
                   fontWeight: 700,
                 }}
