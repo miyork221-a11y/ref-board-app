@@ -29,6 +29,9 @@ export default function Home() {
   const [searchText, setSearchText] = useState("");
   const [newTag, setNewTag] = useState("");
 
+  const [noteDraft, setNoteDraft] = useState("");
+  const [referenceLinkDraft, setReferenceLinkDraft] = useState("");
+
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [creatingProject, setCreatingProject] = useState(false);
   const [addingImage, setAddingImage] = useState(false);
@@ -42,6 +45,10 @@ export default function Home() {
 
   const [viewportWidth, setViewportWidth] = useState(1440);
 
+  const isMobile = viewportWidth <= 640;
+  const isSmallMobile = viewportWidth <= 430;
+  const isTablet = viewportWidth > 640 && viewportWidth <= 1100;
+
   useEffect(() => {
     const updateWidth = () => {
       setViewportWidth(window.innerWidth);
@@ -52,10 +59,6 @@ export default function Home() {
 
     return () => window.removeEventListener("resize", updateWidth);
   }, []);
-
-  const isMobile = viewportWidth <= 640;
-  const isSmallMobile = viewportWidth <= 430;
-  const isTablet = viewportWidth > 640 && viewportWidth <= 1100;
 
   useEffect(() => {
     loadProjects();
@@ -253,7 +256,7 @@ export default function Home() {
 
     const originalUrl = imageUrl.trim();
     let finalImageUrl = originalUrl;
-    let finalReferenceLink = "";
+    let finalReferenceLink = originalUrl;
     let finalTags: string[] = [];
 
     if (isYoutubeUrl(originalUrl)) {
@@ -435,6 +438,17 @@ export default function Home() {
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) || null;
   const selectedItem = items.find((item) => item.id === selectedItemId) || null;
+
+  useEffect(() => {
+    if (!selectedItem) {
+      setNoteDraft("");
+      setReferenceLinkDraft("");
+      return;
+    }
+
+    setNoteDraft(selectedItem.note || "");
+    setReferenceLinkDraft(selectedItem.reference_link || "");
+  }, [selectedItemId, selectedItem?.note, selectedItem?.reference_link]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -900,24 +914,6 @@ export default function Home() {
                     overflow: "hidden",
                   }}
                   onClick={() => setSelectedItemId(item.id)}
-                  onMouseEnter={(e) => {
-                    const overlay = e.currentTarget.querySelector(
-                      ".image-overlay"
-                    ) as HTMLDivElement | null;
-                    if (overlay) {
-                      overlay.style.opacity = "1";
-                      overlay.style.transform = "translateY(0)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const overlay = e.currentTarget.querySelector(
-                      ".image-overlay"
-                    ) as HTMLDivElement | null;
-                    if (overlay) {
-                      overlay.style.opacity = "0";
-                      overlay.style.transform = "translateY(10px)";
-                    }
-                  }}
                 >
                   <img
                     src={item.image_url}
@@ -1112,8 +1108,9 @@ export default function Home() {
             />
 
             <textarea
-              value={selectedItem.note || ""}
-              onChange={(e) => updateNote(selectedItem.id, e.target.value)}
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              onBlur={() => updateNote(selectedItem.id, noteDraft)}
               placeholder="메모 작성"
               style={{
                 width: "100%",
@@ -1147,17 +1144,11 @@ export default function Home() {
                 }}
               >
                 <input
-                  value={selectedItem.reference_link || ""}
-                  onChange={(e) =>
-                    setItems((prev) =>
-                      prev.map((item) =>
-                        item.id === selectedItem.id
-                          ? { ...item, reference_link: e.target.value }
-                          : item
-                      )
-                    )
+                  value={referenceLinkDraft}
+                  onChange={(e) => setReferenceLinkDraft(e.target.value)}
+                  onBlur={() =>
+                    updateReferenceLink(selectedItem.id, referenceLinkDraft)
                   }
-                  onBlur={(e) => updateReferenceLink(selectedItem.id, e.target.value)}
                   placeholder="https://example.com"
                   style={{
                     flex: 1,
@@ -1169,9 +1160,9 @@ export default function Home() {
                   }}
                 />
 
-                {!!selectedItem.reference_link?.trim() && (
+                {!!referenceLinkDraft.trim() && (
                   <a
-                    href={selectedItem.reference_link}
+                    href={referenceLinkDraft}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
