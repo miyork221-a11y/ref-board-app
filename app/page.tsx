@@ -40,6 +40,23 @@ export default function Home() {
   const [activeTag, setActiveTag] = useState<string>("전체");
   const [copyTargetProjectId, setCopyTargetProjectId] = useState<string>("");
 
+  const [viewportWidth, setViewportWidth] = useState(1440);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      setViewportWidth(window.innerWidth);
+    };
+
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
+
+  const isMobile = viewportWidth <= 640;
+  const isSmallMobile = viewportWidth <= 430;
+  const isTablet = viewportWidth > 640 && viewportWidth <= 1100;
+
   useEffect(() => {
     loadProjects();
   }, []);
@@ -443,6 +460,24 @@ export default function Home() {
     });
   }, [items, searchText, activeTag]);
 
+  const toolbarGridColumns = isMobile
+    ? "1fr"
+    : isTablet
+    ? "1fr 1fr"
+    : "0.95fr 0.6fr 0.95fr 0.6fr 1.2fr";
+
+  const imageGridColumns = isMobile
+    ? "1fr"
+    : isTablet
+    ? "repeat(2, minmax(0, 1fr))"
+    : "repeat(4, minmax(0, 1fr))";
+
+  const projectCardWidth = isSmallMobile
+    ? "100%"
+    : isMobile
+    ? "calc(50% - 5px)"
+    : "220px";
+
   return (
     <main
       style={{
@@ -454,11 +489,22 @@ export default function Home() {
       }}
       onClick={() => setOpenProjectMenuId(null)}
     >
-      <div style={{ maxWidth: "1700px", margin: "0 auto", padding: "20px 18px 60px" }}>
-        <section style={{ textAlign: "center", marginBottom: "24px" }}>
+      <div
+        style={{
+          maxWidth: "1700px",
+          margin: "0 auto",
+          padding: isMobile ? "16px 12px 44px" : "20px 18px 60px",
+        }}
+      >
+        <section
+          style={{
+            textAlign: "center",
+            marginBottom: isMobile ? "18px" : "24px",
+          }}
+        >
           <h1
             style={{
-              fontSize: "48px",
+              fontSize: isMobile ? "34px" : "48px",
               fontWeight: 900,
               margin: "0 0 8px",
               letterSpacing: "-1px",
@@ -469,7 +515,8 @@ export default function Home() {
 
           <p
             style={{
-              fontSize: "18px",
+              fontSize: isMobile ? "15px" : "18px",
+              lineHeight: 1.45,
               color: "#666",
               margin: 0,
             }}
@@ -483,7 +530,7 @@ export default function Home() {
             background: "white",
             borderRadius: "20px",
             border: "1px solid #e9e9e9",
-            padding: "14px",
+            padding: isMobile ? "12px" : "14px",
             boxShadow: "0 8px 30px rgba(0,0,0,0.04)",
             marginBottom: "16px",
           }}
@@ -491,7 +538,7 @@ export default function Home() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "0.95fr 0.6fr 0.95fr 0.6fr 1.2fr",
+              gridTemplateColumns: toolbarGridColumns,
               gap: "10px",
               alignItems: "center",
             }}
@@ -501,13 +548,14 @@ export default function Home() {
               onChange={(e) => setProjectName(e.target.value)}
               placeholder="새 프로젝트 이름"
               style={{
-                height: "54px",
+                height: isMobile ? "50px" : "54px",
                 borderRadius: "999px",
                 border: "1px solid #e5e5e5",
                 padding: "0 20px",
-                fontSize: "15px",
+                fontSize: isMobile ? "14px" : "15px",
                 background: "#fafafa",
                 outline: "none",
+                minWidth: 0,
               }}
             />
 
@@ -518,14 +566,15 @@ export default function Home() {
               }}
               disabled={creatingProject}
               style={{
-                height: "54px",
+                height: isMobile ? "50px" : "54px",
                 borderRadius: "999px",
                 border: "1px solid #e8e8e8",
                 background: "#111",
                 color: "white",
-                fontSize: "15px",
+                fontSize: isMobile ? "14px" : "15px",
                 fontWeight: 700,
                 cursor: "pointer",
+                whiteSpace: "nowrap",
               }}
             >
               {creatingProject ? "생성 중..." : "프로젝트 만들기"}
@@ -536,13 +585,14 @@ export default function Home() {
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="이미지 또는 유튜브 링크"
               style={{
-                height: "54px",
+                height: isMobile ? "50px" : "54px",
                 borderRadius: "999px",
                 border: "1px solid #e5e5e5",
                 padding: "0 20px",
-                fontSize: "15px",
+                fontSize: isMobile ? "14px" : "15px",
                 background: "#fafafa",
                 outline: "none",
+                minWidth: 0,
               }}
             />
 
@@ -553,14 +603,15 @@ export default function Home() {
               }}
               disabled={!selectedProjectId || addingImage}
               style={{
-                height: "54px",
+                height: isMobile ? "50px" : "54px",
                 borderRadius: "999px",
                 border: "1px solid #f3d04b",
                 background: !selectedProjectId ? "#e8e0a8" : "#ffd84d",
                 color: "#111",
-                fontSize: "15px",
+                fontSize: isMobile ? "14px" : "15px",
                 fontWeight: 800,
                 cursor: !selectedProjectId ? "not-allowed" : "pointer",
+                whiteSpace: "nowrap",
                 boxShadow: !selectedProjectId
                   ? "none"
                   : "0 8px 20px rgba(255, 216, 77, 0.35)",
@@ -574,13 +625,14 @@ export default function Home() {
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="레퍼런스 검색..."
               style={{
-                height: "54px",
+                height: isMobile ? "50px" : "54px",
                 borderRadius: "999px",
                 border: "1px solid #e5e5e5",
                 padding: "0 20px",
-                fontSize: "16px",
+                fontSize: isMobile ? "14px" : "16px",
                 background: "#fafafa",
                 outline: "none",
+                minWidth: 0,
               }}
             />
           </div>
@@ -618,9 +670,9 @@ export default function Home() {
                     window.history.replaceState({}, "", url.toString());
                   }}
                   style={{
-                    width: "220px",
+                    width: projectCardWidth,
                     borderRadius: "16px",
-                    padding: "14px 16px",
+                    padding: isMobile ? "13px" : "14px 16px",
                     background: selectedProjectId === project.id ? "#111" : "white",
                     color: selectedProjectId === project.id ? "white" : "#111",
                     border:
@@ -647,7 +699,7 @@ export default function Home() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: "17px",
+                          fontSize: isMobile ? "15px" : "17px",
                           fontWeight: 800,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
@@ -753,11 +805,11 @@ export default function Home() {
           </div>
         </section>
 
-        <section style={{ marginBottom: "22px" }}>
+        <section style={{ marginBottom: isMobile ? "18px" : "22px" }}>
           <div
             style={{
               display: "flex",
-              gap: "10px",
+              gap: "8px",
               flexWrap: "wrap",
             }}
           >
@@ -766,13 +818,13 @@ export default function Home() {
                 key={tag}
                 onClick={() => setActiveTag(tag)}
                 style={{
-                  padding: "10px 16px",
+                  padding: isMobile ? "8px 13px" : "10px 16px",
                   borderRadius: "999px",
                   border: activeTag === tag ? "1px solid #111" : "1px solid #e5e5e5",
                   background: activeTag === tag ? "#111" : "white",
                   color: activeTag === tag ? "white" : "#111",
                   cursor: "pointer",
-                  fontSize: "14px",
+                  fontSize: isMobile ? "13px" : "14px",
                   fontWeight: 700,
                 }}
               >
@@ -782,14 +834,19 @@ export default function Home() {
           </div>
         </section>
 
-        <section style={{ textAlign: "center", marginBottom: "34px" }}>
+        <section
+          style={{
+            textAlign: "center",
+            marginBottom: isMobile ? "22px" : "34px",
+          }}
+        >
           <h2
             style={{
-              fontSize: "72px",
+              fontSize: isMobile ? "36px" : isTablet ? "54px" : "72px",
               lineHeight: 1.02,
               margin: "0 0 12px",
               fontWeight: 900,
-              letterSpacing: "-2.4px",
+              letterSpacing: isMobile ? "-1.2px" : "-2.4px",
             }}
           >
             {selectedProject ? selectedProject.name : "레퍼런스 보드"}
@@ -801,7 +858,7 @@ export default function Home() {
             style={{
               textAlign: "center",
               color: "#666",
-              padding: "80px 20px",
+              padding: isMobile ? "56px 18px" : "80px 20px",
               borderRadius: "24px",
               background: "white",
               border: "1px solid #ececec",
@@ -813,8 +870,8 @@ export default function Home() {
           <section
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-              gap: "18px",
+              gridTemplateColumns: imageGridColumns,
+              gap: isMobile ? "14px" : "18px",
               alignItems: "start",
             }}
           >
@@ -880,15 +937,15 @@ export default function Home() {
                         left: "50%",
                         top: "50%",
                         transform: "translate(-50%, -50%)",
-                        width: "54px",
-                        height: "54px",
+                        width: isMobile ? "48px" : "54px",
+                        height: isMobile ? "48px" : "54px",
                         borderRadius: "999px",
                         background: "rgba(0,0,0,0.62)",
                         color: "white",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "24px",
+                        fontSize: isMobile ? "21px" : "24px",
                         fontWeight: 900,
                         pointerEvents: "none",
                         boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
@@ -909,8 +966,8 @@ export default function Home() {
                       background:
                         "linear-gradient(to top, rgba(0,0,0,0.78), rgba(0,0,0,0.35), transparent)",
                       color: "white",
-                      opacity: 0,
-                      transform: "translateY(10px)",
+                      opacity: isMobile ? 1 : 0,
+                      transform: isMobile ? "translateY(0)" : "translateY(10px)",
                       transition: "all 0.22s ease",
                       pointerEvents: "none",
                     }}
@@ -976,7 +1033,7 @@ export default function Home() {
                       fontSize: "14px",
                       color: "#333",
                       lineHeight: 1.45,
-                      minHeight: "42px",
+                      minHeight: isMobile ? "auto" : "42px",
                       marginBottom: "10px",
                     }}
                   >
@@ -1022,10 +1079,11 @@ export default function Home() {
             background: "rgba(0,0,0,0.72)",
             display: "flex",
             justifyContent: "center",
-            alignItems: "center",
-            padding: "20px",
+            alignItems: isMobile ? "flex-start" : "center",
+            padding: isMobile ? "12px" : "20px",
             zIndex: 30,
             backdropFilter: "blur(6px)",
+            overflowY: "auto",
           }}
         >
           <div
@@ -1033,10 +1091,10 @@ export default function Home() {
             style={{
               background: "white",
               color: "#111",
-              padding: "22px",
-              borderRadius: "26px",
-              width: "min(92vw, 1100px)",
-              maxHeight: "92vh",
+              padding: isMobile ? "16px" : "22px",
+              borderRadius: isMobile ? "22px" : "26px",
+              width: isMobile ? "100%" : "min(92vw, 1100px)",
+              maxHeight: isMobile ? "none" : "92vh",
               overflowY: "auto",
               boxShadow: "0 26px 60px rgba(0,0,0,0.24)",
             }}
@@ -1045,7 +1103,7 @@ export default function Home() {
               src={selectedItem.image_url}
               style={{
                 width: "100%",
-                maxHeight: "58vh",
+                maxHeight: isMobile ? "360px" : "58vh",
                 objectFit: "contain",
                 borderRadius: "18px",
                 background: "#f4f4f4",
@@ -1061,7 +1119,7 @@ export default function Home() {
                 width: "100%",
                 marginTop: "14px",
                 padding: "14px",
-                minHeight: "120px",
+                minHeight: isMobile ? "100px" : "120px",
                 borderRadius: "16px",
                 border: "1px solid #dfdfdf",
                 fontSize: "15px",
@@ -1081,7 +1139,13 @@ export default function Home() {
                 참고 링크
               </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: isMobile ? "column" : "row",
+                  gap: "8px",
+                }}
+              >
                 <input
                   value={selectedItem.reference_link || ""}
                   onChange={(e) =>
@@ -1121,6 +1185,7 @@ export default function Home() {
                       textDecoration: "none",
                       fontWeight: 700,
                       whiteSpace: "nowrap",
+                      width: isMobile ? "100%" : "auto",
                     }}
                   >
                     링크 열기
@@ -1166,7 +1231,13 @@ export default function Home() {
                 ))}
               </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: isMobile ? "column" : "row",
+                  gap: "8px",
+                }}
+              >
                 <input
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
@@ -1191,6 +1262,7 @@ export default function Home() {
                     color: "white",
                     cursor: "pointer",
                     fontWeight: 700,
+                    width: isMobile ? "100%" : "auto",
                   }}
                 >
                   태그 추가
@@ -1209,7 +1281,13 @@ export default function Home() {
                 다른 프로젝트에 복사
               </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: isMobile ? "column" : "row",
+                  gap: "8px",
+                }}
+              >
                 <select
                   value={copyTargetProjectId}
                   onChange={(e) => setCopyTargetProjectId(e.target.value)}
@@ -1241,6 +1319,7 @@ export default function Home() {
                     color: "white",
                     cursor: "pointer",
                     fontWeight: 700,
+                    width: isMobile ? "100%" : "auto",
                   }}
                 >
                   {copyingItem ? "복사 중..." : "복사"}
@@ -1251,6 +1330,7 @@ export default function Home() {
             <div
               style={{
                 display: "flex",
+                flexDirection: isMobile ? "column" : "row",
                 gap: "8px",
                 marginTop: "18px",
               }}
@@ -1265,6 +1345,7 @@ export default function Home() {
                   color: "white",
                   cursor: "pointer",
                   fontWeight: 700,
+                  width: isMobile ? "100%" : "auto",
                 }}
               >
                 삭제
@@ -1280,6 +1361,7 @@ export default function Home() {
                   color: "#111",
                   cursor: "pointer",
                   fontWeight: 700,
+                  width: isMobile ? "100%" : "auto",
                 }}
               >
                 닫기
