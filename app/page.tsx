@@ -845,18 +845,6 @@ export default function Home() {
                         >
                           {project.name}
                         </div>
-
-                        {!isMobile && (
-                          <div
-                            style={{
-                              fontSize: "11px",
-                              marginTop: "6px",
-                              color: isActive ? "rgba(255,255,255,0.58)" : "#999",
-                            }}
-                          >
-                            드래그로 순서 변경
-                          </div>
-                        )}
                       </div>
 
                       <div style={{ position: "relative", overflow: "visible" }}>
