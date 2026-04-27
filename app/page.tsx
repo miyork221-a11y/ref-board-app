@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { supabase } from "@/lib/supabase/client";
 
 type Project = {
   id: string;
   name: string;
   created_at: string;
+  sort_order: number | null;
 };
 
 type ProjectItem = {
@@ -44,6 +45,9 @@ export default function Home() {
   const [copyTargetProjectId, setCopyTargetProjectId] = useState<string>("");
 
   const [viewportWidth, setViewportWidth] = useState(1440);
+  const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
+  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
+  const [isSavingProjectOrder, setIsSavingProjectOrder] = useState(false);
 
   const isMobile = viewportWidth <= 640;
   const isSmallMobile = viewportWidth <= 430;
@@ -129,6 +133,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from("projects")
       .select("*")
+      .order("sort_order", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
 
     setLoadingProjects(false);
@@ -164,17 +169,83 @@ export default function Home() {
     setItems(data || []);
   };
 
+  const saveProjectOrder = async (nextProjects: Project[]) => {
+    setIsSavingProjectOrder(true);
+
+    const results = await Promise.all(
+      nextProjects.map((project, index) =>
+        supabase
+          .from("projects")
+          .update({ sort_order: index + 1 })
+          .eq("id", project.id)
+      )
+    );
+
+    setIsSavingProjectOrder(false);
+
+    const failed = results.find((result) => result.error);
+
+    if (failed?.error) {
+      console.error(failed.error);
+      alert(`프로젝트 순서 저장 실패: ${failed.error.message}`);
+      await loadProjects();
+    }
+  };
+
+  const handleProjectDrop = async (
+    event: DragEvent<HTMLDivElement>,
+    targetProjectId: string
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!draggedProjectId || draggedProjectId === targetProjectId) {
+      setDraggedProjectId(null);
+      setDragOverProjectId(null);
+      return;
+    }
+
+    const draggedIndex = projects.findIndex((project) => project.id === draggedProjectId);
+    const targetIndex = projects.findIndex((project) => project.id === targetProjectId);
+
+    if (draggedIndex < 0 || targetIndex < 0) {
+      setDraggedProjectId(null);
+      setDragOverProjectId(null);
+      return;
+    }
+
+    const nextProjects = [...projects];
+    const [draggedProject] = nextProjects.splice(draggedIndex, 1);
+    nextProjects.splice(targetIndex, 0, draggedProject);
+
+    const orderedProjects = nextProjects.map((project, index) => ({
+      ...project,
+      sort_order: index + 1,
+    }));
+
+    setProjects(orderedProjects);
+    setDraggedProjectId(null);
+    setDragOverProjectId(null);
+
+    await saveProjectOrder(orderedProjects);
+  };
+
   const addProject = async () => {
     if (!projectName.trim()) {
       alert("프로젝트 이름을 입력하세요.");
       return;
     }
 
+    const maxOrder =
+      projects.length > 0
+        ? Math.max(...projects.map((project) => project.sort_order || 0))
+        : 0;
+
     setCreatingProject(true);
 
     const { data, error } = await supabase
       .from("projects")
-      .insert([{ name: projectName.trim() }])
+      .insert([{ name: projectName.trim(), sort_order: maxOrder + 1 }])
       .select()
       .single();
 
@@ -218,10 +289,19 @@ export default function Home() {
     }
 
     const nextProjects = projects.filter((p) => p.id !== projectId);
-    setProjects(nextProjects);
+    const orderedProjects = nextProjects.map((project, index) => ({
+      ...project,
+      sort_order: index + 1,
+    }));
+
+    setProjects(orderedProjects);
+
+    if (orderedProjects.length > 0) {
+      await saveProjectOrder(orderedProjects);
+    }
 
     if (selectedProjectId === projectId) {
-      const nextSelectedId = nextProjects[0]?.id ?? null;
+      const nextSelectedId = orderedProjects[0]?.id ?? null;
       setSelectedProjectId(nextSelectedId);
       setSelectedItemId(null);
 
@@ -652,6 +732,19 @@ export default function Home() {
           </div>
         </section>
 
+        {isSavingProjectOrder && (
+          <div
+            style={{
+              marginBottom: "12px",
+              color: "#666",
+              fontSize: "13px",
+              fontWeight: 700,
+            }}
+          >
+            프로젝트 순서 저장 중...
+          </div>
+        )}
+
         <section style={{ marginBottom: "14px" }}>
           <div
             style={{
@@ -670,151 +763,192 @@ export default function Home() {
                 프로젝트가 없습니다.
               </div>
             ) : (
-              projects.map((project) => (
-                <div
-                  key={project.id}
-                  onClick={() => {
-                    setSelectedProjectId(project.id);
-                    setSelectedItemId(null);
-                    setOpenProjectMenuId(null);
-                    setActiveTag("전체");
+              projects.map((project) => {
+                const isActive = selectedProjectId === project.id;
+                const isDragging = draggedProjectId === project.id;
+                const isDragOver = dragOverProjectId === project.id;
 
-                    const url = new URL(window.location.href);
-                    url.searchParams.set("project", project.id);
-                    window.history.replaceState({}, "", url.toString());
-                  }}
-                  style={{
-                    width: projectCardWidth,
-                    borderRadius: "16px",
-                    padding: isMobile ? "13px" : "14px 16px",
-                    background: selectedProjectId === project.id ? "#111" : "white",
-                    color: selectedProjectId === project.id ? "white" : "#111",
-                    border:
-                      selectedProjectId === project.id
+                return (
+                  <div
+                    key={project.id}
+                    draggable={!isMobile}
+                    onDragStart={(e) => {
+                      if (isMobile) return;
+                      setDraggedProjectId(project.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      if (isMobile) return;
+                      e.preventDefault();
+                      setDragOverProjectId(project.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverProjectId === project.id) {
+                        setDragOverProjectId(null);
+                      }
+                    }}
+                    onDrop={(e) => handleProjectDrop(e, project.id)}
+                    onDragEnd={() => {
+                      setDraggedProjectId(null);
+                      setDragOverProjectId(null);
+                    }}
+                    onClick={() => {
+                      setSelectedProjectId(project.id);
+                      setSelectedItemId(null);
+                      setOpenProjectMenuId(null);
+                      setActiveTag("전체");
+
+                      const url = new URL(window.location.href);
+                      url.searchParams.set("project", project.id);
+                      window.history.replaceState({}, "", url.toString());
+                    }}
+                    title={!isMobile ? "드래그해서 순서를 바꿀 수 있습니다." : ""}
+                    style={{
+                      width: projectCardWidth,
+                      borderRadius: "16px",
+                      padding: isMobile ? "13px" : "14px 16px",
+                      background: isActive ? "#111" : "white",
+                      color: isActive ? "white" : "#111",
+                      border: isDragOver
+                        ? "2px dashed #111"
+                        : isActive
                         ? "1px solid #111"
                         : "1px solid #e7e7e7",
-                    cursor: "pointer",
-                    position: "relative",
-                    boxShadow:
-                      selectedProjectId === project.id
+                      cursor: isMobile ? "pointer" : "grab",
+                      position: "relative",
+                      boxShadow: isActive
                         ? "0 10px 24px rgba(0,0,0,0.12)"
                         : "0 4px 12px rgba(0,0,0,0.03)",
-                    overflow: "visible",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      gap: "10px",
+                      overflow: "visible",
+                      opacity: isDragging ? 0.45 : 1,
+                      transform: isDragOver ? "translateY(-2px)" : "none",
+                      transition: "0.16s ease",
                     }}
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: isMobile ? "15px" : "17px",
-                          fontWeight: 800,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {project.name}
-                      </div>
-                    </div>
-
-                    <div style={{ position: "relative", overflow: "visible" }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenProjectMenuId((prev) =>
-                            prev === project.id ? null : project.id
-                          );
-                        }}
-                        style={{
-                          width: "34px",
-                          height: "34px",
-                          borderRadius: "10px",
-                          border:
-                            selectedProjectId === project.id
-                              ? "1px solid rgba(255,255,255,0.16)"
-                              : "1px solid #ececec",
-                          background:
-                            selectedProjectId === project.id ? "#1e1e1e" : "#fafafa",
-                          color: selectedProjectId === project.id ? "white" : "#111",
-                          cursor: "pointer",
-                          fontSize: "18px",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        ⋯
-                      </button>
-
-                      {openProjectMenuId === project.id && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: "10px",
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div
-                          onClick={(e) => e.stopPropagation()}
                           style={{
-                            position: "absolute",
-                            top: "42px",
-                            right: 0,
-                            minWidth: "140px",
-                            background: "white",
-                            border: "1px solid #e8e8e8",
-                            borderRadius: "14px",
+                            fontSize: isMobile ? "15px" : "17px",
+                            fontWeight: 800,
+                            whiteSpace: "nowrap",
                             overflow: "hidden",
-                            boxShadow: "0 14px 32px rgba(0,0,0,0.12)",
-                            zIndex: 50,
+                            textOverflow: "ellipsis",
                           }}
                         >
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(
-                                `${window.location.origin}?project=${project.id}`
-                              );
-                              alert("공유용 링크를 복사했습니다.");
-                              setOpenProjectMenuId(null);
-                            }}
-                            style={{
-                              width: "100%",
-                              padding: "12px 14px",
-                              border: "none",
-                              borderBottom: "1px solid #f0f0f0",
-                              background: "white",
-                              textAlign: "left",
-                              cursor: "pointer",
-                              fontSize: "14px",
-                              color: "#111",
-                              fontWeight: 600,
-                            }}
-                          >
-                            링크 복사
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              deleteProject(project.id);
-                            }}
-                            disabled={deletingProjectId === project.id}
-                            style={{
-                              width: "100%",
-                              padding: "12px 14px",
-                              border: "none",
-                              background: "white",
-                              textAlign: "left",
-                              cursor: "pointer",
-                              fontSize: "14px",
-                              color: "#d93025",
-                            }}
-                          >
-                            {deletingProjectId === project.id ? "삭제 중..." : "삭제"}
-                          </button>
+                          {project.name}
                         </div>
-                      )}
+
+                        {!isMobile && (
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              marginTop: "6px",
+                              color: isActive ? "rgba(255,255,255,0.58)" : "#999",
+                            }}
+                          >
+                            드래그로 순서 변경
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ position: "relative", overflow: "visible" }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenProjectMenuId((prev) =>
+                              prev === project.id ? null : project.id
+                            );
+                          }}
+                          style={{
+                            width: "34px",
+                            height: "34px",
+                            borderRadius: "10px",
+                            border: isActive
+                              ? "1px solid rgba(255,255,255,0.16)"
+                              : "1px solid #ececec",
+                            background: isActive ? "#1e1e1e" : "#fafafa",
+                            color: isActive ? "white" : "#111",
+                            cursor: "pointer",
+                            fontSize: "18px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          ⋯
+                        </button>
+
+                        {openProjectMenuId === project.id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: "absolute",
+                              top: "42px",
+                              right: 0,
+                              minWidth: "140px",
+                              background: "white",
+                              border: "1px solid #e8e8e8",
+                              borderRadius: "14px",
+                              overflow: "hidden",
+                              boxShadow: "0 14px 32px rgba(0,0,0,0.12)",
+                              zIndex: 50,
+                            }}
+                          >
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  `${window.location.origin}?project=${project.id}`
+                                );
+                                alert("공유용 링크를 복사했습니다.");
+                                setOpenProjectMenuId(null);
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "12px 14px",
+                                border: "none",
+                                borderBottom: "1px solid #f0f0f0",
+                                background: "white",
+                                textAlign: "left",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                color: "#111",
+                                fontWeight: 600,
+                              }}
+                            >
+                              링크 복사
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                deleteProject(project.id);
+                              }}
+                              disabled={deletingProjectId === project.id}
+                              style={{
+                                width: "100%",
+                                padding: "12px 14px",
+                                border: "none",
+                                background: "white",
+                                textAlign: "left",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                color: "#d93025",
+                              }}
+                            >
+                              {deletingProjectId === project.id ? "삭제 중..." : "삭제"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </section>
@@ -1146,9 +1280,7 @@ export default function Home() {
                 <input
                   value={referenceLinkDraft}
                   onChange={(e) => setReferenceLinkDraft(e.target.value)}
-                  onBlur={() =>
-                    updateReferenceLink(selectedItem.id, referenceLinkDraft)
-                  }
+                  onBlur={() => updateReferenceLink(selectedItem.id, referenceLinkDraft)}
                   placeholder="https://example.com"
                   style={{
                     flex: 1,
